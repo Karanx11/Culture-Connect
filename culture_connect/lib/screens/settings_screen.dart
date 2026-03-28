@@ -1,4 +1,8 @@
 import 'dart:ui';
+import 'package:culture_connect/components/about_us_screen.dart';
+import 'package:culture_connect/components/help_support_screen.dart';
+import 'package:culture_connect/components/terms_screen.dart';
+import 'package:culture_connect/screens/notification_page.dart';
 import 'package:flutter/material.dart';
 import 'edit_profile_screen.dart';
 import 'add_post_screen.dart';
@@ -52,7 +56,16 @@ class SettingsScreen extends StatelessWidget {
             title: "Notifications",
             onTap: () {},
           ),
-          _tile(icon: Icons.lock, title: "Privacy", onTap: () {}),
+          _tile(
+            icon: Icons.lock,
+            title: "Privacy",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationScreen()),
+              );
+            },
+          ),
 
           const SizedBox(height: 20),
 
@@ -61,10 +74,33 @@ class SettingsScreen extends StatelessWidget {
           _tile(
             icon: Icons.description,
             title: "Terms & Conditions",
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TermsScreen()),
+              );
+            },
           ),
-          _tile(icon: Icons.info, title: "About Us", onTap: () {}),
-          _tile(icon: Icons.help, title: "Help & Support", onTap: () {}),
+          _tile(
+            icon: Icons.info,
+            title: "About Us",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AboutUsScreen()),
+              );
+            },
+          ),
+          _tile(
+            icon: Icons.help,
+            title: "Help & Support",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+              );
+            },
+          ),
 
           const SizedBox(height: 20),
 

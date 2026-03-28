@@ -1,5 +1,5 @@
 import 'package:culture_connect/components/add_story_page.dart';
-import 'package:culture_connect/components/notification_page.dart';
+import 'package:culture_connect/screens/notification_page.dart';
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatefulWidget {
