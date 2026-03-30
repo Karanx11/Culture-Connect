@@ -49,12 +49,17 @@ class SettingsScreen extends StatelessWidget {
 
           const SizedBox(height: 20),
 
-          /// 🔔 APP SETTINGS
+          /// APP SETTINGS
           _sectionTitle("App"),
           _tile(
             icon: Icons.notifications,
             title: "Notifications",
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationScreen()),
+              );
+            },
           ),
           _tile(
             icon: Icons.lock,

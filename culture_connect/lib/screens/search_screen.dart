@@ -21,7 +21,7 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             const SizedBox(height: 10),
 
-            /// 🔍 GLASS SEARCH BAR
+            ///  GLASS SEARCH BAR
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: ClipRRect(
@@ -52,7 +52,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
             const SizedBox(height: 15),
 
-            /// 🧊 CATEGORY CHIPS (optional)
+            /// CATEGORY CHIPS (optional)
             SizedBox(
               height: 40,
               child: ListView(
@@ -70,7 +70,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
             const SizedBox(height: 10),
 
-            /// 📸 EXPLORE GRID
+            /// EXPLORE GRID
             Expanded(
               child: GridView.builder(
                 padding: const EdgeInsets.all(4),

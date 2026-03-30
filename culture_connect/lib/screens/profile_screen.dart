@@ -11,116 +11,131 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   int selectedTab = 0;
-
-  /// 🔥 CHANGE THIS LATER (backend)
-  bool hasPosts = false;
+  bool hasPosts = true;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF1A0F0A),
 
-      /// 🔝 APPBAR
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text("karan_x11"),
+        title: const Text("Profile"),
         actions: [
           IconButton(
             icon: const Icon(Icons.add_box_outlined),
-            onPressed: () => _openCreatePost(),
+            onPressed: _openCreatePost,
           ),
-          IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => _openMenu(),
-          ),
+          IconButton(icon: const Icon(Icons.menu), onPressed: _openMenu),
         ],
       ),
 
       body: SingleChildScrollView(
         child: Column(
           children: [
-            /// 👤 PROFILE HEADER
+            /// 🔥 PROFILE CARD
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: _openCreatePost,
-                    child: const CircleAvatar(
-                      radius: 40,
-                      backgroundImage: AssetImage("assets/images/logo.jpg"),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF241510),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: Column(
+                  children: [
+                    /// COVER + PROFILE
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        /// COVER
+                        Container(
+                          height: 120,
+                          decoration: const BoxDecoration(
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(25),
+                            ),
+                            gradient: LinearGradient(
+                              colors: [Color(0xFFFF5100), Color(0xFF1A0F0A)],
+                            ),
+                          ),
+                        ),
+
+                        /// PROFILE PIC (CENTER)
+                        Positioned(
+                          bottom: -40,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: const Color(0xFF241510),
+                                  width: 4,
+                                ),
+                              ),
+                              child: const CircleAvatar(
+                                radius: 40,
+                                backgroundImage: AssetImage(
+                                  "assets/images/logo.jpg",
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
 
-                  const SizedBox(width: 20),
+                    const SizedBox(height: 50),
 
-                  Expanded(
-                    child: Row(
+                    /// NAME + USERNAME
+                    const Text(
+                      "Karan Sharma",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      "@karan_x11",
+                      style: TextStyle(color: Colors.white70),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    /// STATS ROW
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: const [
+                      children: [
                         _StatItem("12", "Posts"),
                         _StatItem("340", "Followers"),
                         _StatItem("180", "Following"),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
 
-            /// NAME + BIO
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Karan Sharma",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    "Culture Explorer 🌍",
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ],
-              ),
-            ),
+                    const SizedBox(height: 15),
 
-            const SizedBox(height: 12),
+                    /// BIO
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        "Culture Explorer 🌍 | Bihar ❤️ | Sharing traditions & vibes",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ),
 
-            /// EDIT PROFILE
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF5100),
+                    const SizedBox(height: 20),
+
+                    const SizedBox(height: 20),
+                  ],
                 ),
-                onPressed: () {},
-                child: const Text("Edit Profile"),
               ),
             ),
 
-            const SizedBox(height: 15),
-
-            /// 🔥 STORY HIGHLIGHTS
-            SizedBox(
-              height: 90,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [
-                  _highlight("Festivals"),
-                  _highlight("Food"),
-                  _highlight("Dance"),
-                ],
-              ),
-            ),
-
-            const Divider(),
-
-            /// TABS
+            /// 🔥 POSTS SECTION
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -141,12 +156,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
 
-            /// CONTENT
             selectedTab == 0
                 ? _buildGrid()
                 : const Padding(
                     padding: EdgeInsets.all(20),
-                    child: Text("Reels coming soon..."),
+                    child: Text("Videos coming soon..."),
                   ),
           ],
         ),
@@ -154,28 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// 📸 GRID OR EMPTY STATE
   Widget _buildGrid() {
-    if (!hasPosts) {
-      return Column(
-        children: [
-          const SizedBox(height: 40),
-          const Icon(Icons.add_a_photo, size: 50, color: Colors.white54),
-          const SizedBox(height: 10),
-          const Text("No posts yet", style: TextStyle(color: Colors.white70)),
-          const SizedBox(height: 10),
-
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF5100),
-            ),
-            onPressed: _openCreatePost,
-            child: const Text("Create Your First Post"),
-          ),
-        ],
-      );
-    }
-
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -184,40 +177,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisCount: 3,
       ),
       itemBuilder: (context, index) {
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => PostViewerScreen(index: index)),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.all(2),
-            color: const Color(0xFFFF5100),
-          ),
+        return Container(
+          margin: const EdgeInsets.all(2),
+          color: const Color(0xFFFF5100),
         );
       },
     );
   }
 
-  /// 🔘 HIGHLIGHT → CREATE POST
-  Widget _highlight(String text) {
-    return GestureDetector(
-      onTap: _openCreatePost,
-      child: Padding(
-        padding: const EdgeInsets.only(right: 12),
-        child: Column(
-          children: [
-            const CircleAvatar(radius: 28),
-            const SizedBox(height: 5),
-            Text(text),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 🔥 OPEN CREATE POST
   void _openCreatePost() {
     Navigator.push(
       context,
@@ -225,7 +192,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// 📂 MENU
   void _openMenu() {
     showModalBottomSheet(
       context: context,
@@ -239,10 +205,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               MaterialPageRoute(builder: (_) => const SettingsScreen()),
             ),
           ),
-          ListTile(
-            title: const Text("Logout"),
-            onTap: () => Navigator.pop(context),
-          ),
+          const ListTile(title: Text("Logout")),
         ],
       ),
     );
@@ -263,38 +226,6 @@ class _StatItem extends StatelessWidget {
         Text(count, style: const TextStyle(fontWeight: FontWeight.bold)),
         Text(label),
       ],
-    );
-  }
-}
-
-/// 🖼 POST VIEWER
-class PostViewerScreen extends StatefulWidget {
-  final int index;
-  const PostViewerScreen({super.key, required this.index});
-
-  @override
-  State<PostViewerScreen> createState() => _PostViewerScreenState();
-}
-
-class _PostViewerScreenState extends State<PostViewerScreen> {
-  bool liked = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Post ${widget.index}")),
-      body: Column(
-        children: [
-          Expanded(child: Container(color: const Color(0xFFFF5100))),
-          IconButton(
-            icon: Icon(
-              liked ? Icons.favorite : Icons.favorite_border,
-              color: liked ? Colors.red : null,
-            ),
-            onPressed: () => setState(() => liked = !liked),
-          ),
-        ],
-      ),
     );
   }
 }

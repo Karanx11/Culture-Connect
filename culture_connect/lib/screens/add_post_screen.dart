@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -12,7 +13,13 @@ class CreatePostScreen extends StatefulWidget {
 
 class _CreatePostScreenState extends State<CreatePostScreen> {
   File? image;
+  File? video;
+
+  VideoPlayerController? videoController;
+
   final picker = ImagePicker();
+
+  int selectedType = 0; // 0 = Post, 1 = Reel
 
   final TextEditingController captionController = TextEditingController();
   final TextEditingController locationController = TextEditingController();
@@ -24,8 +31,33 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (picked != null) {
       setState(() {
         image = File(picked.path);
+        video = null;
       });
     }
+  }
+
+  /// 🎥 PICK VIDEO
+  Future<void> pickVideo() async {
+    final picked = await picker.pickVideo(source: ImageSource.gallery);
+
+    if (picked != null) {
+      video = File(picked.path);
+      videoController = VideoPlayerController.file(video!)
+        ..initialize().then((_) {
+          setState(() {});
+          videoController!.setLooping(true);
+          videoController!.play();
+        });
+
+      image = null;
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    videoController?.dispose();
+    super.dispose();
   }
 
   @override
@@ -34,34 +66,32 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       backgroundColor: const Color(0xFF1A0F0A),
 
       appBar: AppBar(
-        title: const Text("Create Post"),
+        title: const Text("Create"),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          TextButton(
-            onPressed: () {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text("Post uploaded 🚀")));
-            },
-            child: const Text(
-              "Post",
-              style: TextStyle(
-                color: Color(0xFFFF5100),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
       ),
 
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            /// 🖼 IMAGE PREVIEW
+            /// 🔥 TOGGLE (POST / REEL)
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Row(
+                children: [_tabButton("Photos", 0), _tabButton("Video", 1)],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            /// 📸 / 🎥 PREVIEW
             GestureDetector(
-              onTap: pickImage,
+              onTap: selectedType == 0 ? pickImage : pickVideo,
               child: Container(
                 height: 250,
                 width: double.infinity,
@@ -70,34 +100,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.white.withOpacity(0.2)),
                 ),
-                child: image == null
-                    ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.add_a_photo,
-                              size: 40,
-                              color: Colors.white70,
-                            ),
-                            SizedBox(height: 10),
-                            Text(
-                              "Tap to add photo",
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Image.file(image!, fit: BoxFit.cover),
-                      ),
+                child: _buildPreview(),
               ),
             ),
 
             const SizedBox(height: 20),
 
-            /// 🧊 CAPTION FIELD
+            /// 🧊 CAPTION
             _glassInput(
               controller: captionController,
               hint: "Write a caption...",
@@ -107,7 +116,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
             const SizedBox(height: 15),
 
-            /// 📍 LOCATION FIELD
+            /// 📍 LOCATION
             _glassInput(
               controller: locationController,
               hint: "Add location",
@@ -116,7 +125,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
             const SizedBox(height: 25),
 
-            /// 🚀 POST BUTTON
+            /// 🚀 SHARE BUTTON
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -128,13 +137,24 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ),
                 ),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Post uploaded 🚀")),
-                  );
+                  if (selectedType == 0 && image == null) {
+                    _showMsg("Please select an image");
+                    return;
+                  }
+                  if (selectedType == 1 && video == null) {
+                    _showMsg("Please select a video");
+                    return;
+                  }
+
+                  _showMsg("Uploaded successfully 🚀");
+                  Navigator.pop(context);
                 },
-                child: const Text(
-                  "Share Post",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                child: Text(
+                  selectedType == 0 ? "Share Post" : "Upload Reel",
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -144,7 +164,84 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  /// 🧊 GLASS INPUT
+  /// 🔘 TAB BUTTON
+  Widget _tabButton(String text, int index) {
+    final isSelected = selectedType == index;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => selectedType = index),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFFF5100) : Colors.transparent,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Center(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : Colors.white70,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 🎥 / 📸 PREVIEW BUILDER
+  Widget _buildPreview() {
+    if (selectedType == 0) {
+      /// IMAGE
+      if (image == null) {
+        return const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.add_a_photo, size: 40, color: Colors.white70),
+              SizedBox(height: 10),
+              Text("Tap to add photo", style: TextStyle(color: Colors.white70)),
+            ],
+          ),
+        );
+      } else {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Image.file(image!, fit: BoxFit.cover),
+        );
+      }
+    } else {
+      /// VIDEO
+      if (video == null || videoController == null) {
+        return const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.video_call, size: 40, color: Colors.white70),
+              SizedBox(height: 10),
+              Text("Tap to add reel", style: TextStyle(color: Colors.white70)),
+            ],
+          ),
+        );
+      } else {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: AspectRatio(
+            aspectRatio: videoController!.value.aspectRatio,
+            child: VideoPlayer(videoController!),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showMsg(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// 🧊 INPUT
   Widget _glassInput({
     required TextEditingController controller,
     required String hint,

@@ -1,5 +1,9 @@
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
+
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -13,19 +17,58 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool isObscure = true;
 
+  // 🔥 GOOGLE LOGIN FUNCTION
+  Future<void> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+
+      if (googleUser == null) return;
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final String idToken = googleAuth.idToken!;
+
+      print("ID TOKEN: $idToken");
+
+      // 🔥 SEND TO BACKEND
+      final response = await http.post(
+        Uri.parse("http://10.0.2.2:5000/api/auth/google"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "token": idToken,
+          "name": googleUser.displayName,
+          "email": googleUser.email,
+        }),
+      );
+
+      print("Backend Response: ${response.body}");
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Login Successful 🚀")));
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Login Failed ❌")));
+      }
+    } catch (e) {
+      print("Login Error: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          /// 🌄 BG IMAGE
           SizedBox.expand(
             child: Image.asset("assets/images/auth.jpg", fit: BoxFit.cover),
           ),
 
           Container(color: Colors.black.withOpacity(0.4)),
 
-          /// 🧊 GLASS CARD
           Center(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(25),
@@ -53,12 +96,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 20),
 
-                      /// EMAIL
                       _inputField("Email", Icons.email),
 
                       const SizedBox(height: 15),
 
-                      /// PASSWORD
                       TextField(
                         obscureText: isObscure,
                         style: const TextStyle(color: Colors.white),
@@ -78,7 +119,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
 
-                      /// FORGOT PASSWORD
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
@@ -99,12 +139,35 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 10),
 
-                      /// LOGIN BTN
+                      // 🔥 NORMAL LOGIN (optional)
                       _button("Login"),
 
                       const SizedBox(height: 10),
 
-                      /// SIGNUP
+                      // 🔥 GOOGLE LOGIN BUTTON
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: signInWithGoogle,
+                          child: const Text(
+                            "Sign in with Google",
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -142,7 +205,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// 🔧 COMPONENTS
   Widget _inputField(String hint, IconData icon) {
     return TextField(
       style: const TextStyle(color: Colors.white),
