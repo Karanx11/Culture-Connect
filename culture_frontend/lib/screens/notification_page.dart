@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+
+import 'profile_screen.dart';
+import 'post_view_screen.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -9,153 +14,268 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
-  List<Map<String, dynamic>> notifications = [
-    {
-      "title": "New follower",
-      "subtitle": "Rahul started following you",
-      "time": DateTime.now().subtract(const Duration(minutes: 5)),
-    },
-    {
-      "title": "Post liked",
-      "subtitle": "Aman liked your post",
-      "time": DateTime.now().subtract(const Duration(hours: 2)),
-    },
-    {
-      "title": "Comment",
-      "subtitle": "Someone commented on your post",
-      "time": DateTime.now().subtract(const Duration(days: 1)),
-    },
-    {
-      "title": "New follower",
-      "subtitle": "Priya started following you",
-      "time": DateTime.now().subtract(const Duration(days: 10)),
-    },
-  ];
+  final currentUser = FirebaseAuth.instance.currentUser!.uid;
 
-  /// 🔥 GROUP BY MONTH & DATE
-  Map<String, Map<String, List<Map<String, dynamic>>>> groupData() {
-    Map<String, Map<String, List<Map<String, dynamic>>>> grouped = {};
+  /// 🔥 CACHE USERS (performance boost)
+  final Map<String, Map<String, dynamic>> userCache = {};
 
-    for (var notif in notifications) {
-      DateTime time = notif["time"];
+  /// 🔥 BATCH MARK ALL AS SEEN (optimized)
+  Future<void> markAllSeen(List docs) async {
+    final batch = FirebaseFirestore.instance.batch();
 
-      String month = DateFormat('MMMM yyyy').format(time);
-      String date = DateFormat('dd MMM yyyy').format(time);
-
-      grouped.putIfAbsent(month, () => {});
-      grouped[month]!.putIfAbsent(date, () => []);
-      grouped[month]![date]!.add(notif);
+    for (var doc in docs) {
+      if (!(doc['isSeen'] ?? false)) {
+        batch.update(doc.reference, {"isSeen": true});
+      }
     }
 
-    return grouped;
+    await batch.commit();
   }
 
-  /// ❌ DELETE CONFIRMATION
-  Future<bool> confirmDelete(int index) async {
-    return await showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text("Delete Notification"),
-            content: const Text("Are you sure you want to delete this?"),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text("Cancel"),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text(
-                  "Delete",
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ],
+  /// 🔥 DELETE WITH CONFIRMATION
+  Future<void> deleteNotification(String id) async {
+    final confirm = await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Delete Notification"),
+        content: const Text("Are you sure?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
           ),
-        ) ??
-        false;
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await FirebaseFirestore.instance
+          .collection('notifications')
+          .doc(id)
+          .delete();
+    }
+  }
+
+  /// 🔥 FETCH USER WITH CACHE
+  Future<Map<String, dynamic>> getUser(String uid) async {
+    if (userCache.containsKey(uid)) return userCache[uid]!;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+
+    final data = doc.data() ?? {};
+    userCache[uid] = data;
+
+    return data;
+  }
+
+  /// 🔥 GROUPING LOGIC
+  String getGroupLabel(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time).inDays;
+
+    if (difference == 0) return "Today";
+    if (difference == 1) return "Yesterday";
+    return "Earlier";
   }
 
   @override
   Widget build(BuildContext context) {
-    final grouped = groupData();
-
     return Scaffold(
       backgroundColor: const Color(0xFF1A0F0A),
 
       appBar: AppBar(
         title: const Text("Notifications"),
         backgroundColor: Colors.transparent,
-        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.done_all),
+            onPressed: () async {
+              final snap = await FirebaseFirestore.instance
+                  .collection('notifications')
+                  .where('toUserId', isEqualTo: currentUser)
+                  .get();
+
+              await markAllSeen(snap.docs);
+            },
+          ),
+        ],
       ),
 
-      body: ListView(
-        children: grouped.entries.map((monthEntry) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              /// 📅 MONTH
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  monthEntry.key,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          setState(() {});
+        },
 
-              ...monthEntry.value.entries.map((dateEntry) {
+        child: StreamBuilder(
+          stream: FirebaseFirestore.instance
+              .collection('notifications')
+              .where('toUserId', isEqualTo: currentUser)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            /// 🔄 LOADING STATE
+            if (!snapshot.hasData) {
+              return ListView.builder(
+                itemCount: 6,
+                itemBuilder: (_, __) => const ListTile(
+                  leading: CircleAvatar(),
+                  title: Text("Loading..."),
+                ),
+              );
+            }
+
+            final docs = snapshot.data!.docs;
+
+            if (docs.isEmpty) {
+              return const Center(child: Text("No notifications"));
+            }
+
+            /// mark seen automatically
+            markAllSeen(docs);
+
+            /// 🔥 GROUP DATA
+            Map<String, List> grouped = {};
+
+            for (var doc in docs) {
+              final ts = doc['createdAt'];
+              if (ts == null) continue;
+
+              final time = ts.toDate();
+              final label = getGroupLabel(time);
+
+              grouped.putIfAbsent(label, () => []);
+              grouped[label]!.add(doc);
+            }
+
+            final keys = grouped.keys.toList();
+
+            return ListView.builder(
+              itemCount: keys.length,
+              itemBuilder: (context, index) {
+                final label = keys[index];
+                final items = grouped[label]!;
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    /// 🗓 DATE
+                    /// 🏷️ SECTION TITLE
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.all(12),
                       child: Text(
-                        dateEntry.key,
-                        style: const TextStyle(color: Colors.white70),
+                        label,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
 
-                    /// 🔔 NOTIFICATIONS
-                    ...dateEntry.value.map((notif) {
-                      int index = notifications.indexOf(notif);
+                    ...items.map((data) {
+                      return FutureBuilder(
+                        future: getUser(data['fromUserId']),
+                        builder: (context, userSnap) {
+                          if (!userSnap.hasData) {
+                            return const ListTile(
+                              leading: CircleAvatar(),
+                              title: Text("Loading..."),
+                            );
+                          }
 
-                      return Dismissible(
-                        key: Key(index.toString()),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          color: Colors.red,
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 20),
-                          child: const Icon(Icons.delete, color: Colors.white),
-                        ),
-                        confirmDismiss: (_) async {
-                          return await confirmDelete(index);
+                          final user = userSnap.data!;
+                          final isSeen = data['isSeen'] ?? false;
+
+                          final time = data['createdAt'] != null
+                              ? DateFormat(
+                                  'hh:mm a',
+                                ).format(data['createdAt'].toDate())
+                              : "";
+
+                          return Dismissible(
+                            key: Key(data.id),
+                            direction: DismissDirection.endToStart,
+
+                            background: Container(
+                              color: Colors.red,
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              child: const Icon(
+                                Icons.delete,
+                                color: Colors.white,
+                              ),
+                            ),
+
+                            onDismissed: (_) {
+                              deleteNotification(data.id);
+                            },
+
+                            child: ListTile(
+                              tileColor: isSeen
+                                  ? Colors.transparent
+                                  : Colors.white.withOpacity(0.08),
+
+                              leading: CircleAvatar(
+                                backgroundImage:
+                                    user['profileUrl'] != null &&
+                                        user['profileUrl'].toString().isNotEmpty
+                                    ? NetworkImage(user['profileUrl'])
+                                    : null,
+                                child: user['profileUrl'] == null
+                                    ? const Icon(Icons.person)
+                                    : null,
+                              ),
+
+                              title: Text(
+                                "${user['username'] ?? "User"} ${data['text']}",
+                                style: const TextStyle(fontSize: 14),
+                              ),
+
+                              subtitle: Text(
+                                time,
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+
+                              onLongPress: () {
+                                deleteNotification(data.id);
+                              },
+
+                              onTap: () {
+                                if (data['type'] == "follow") {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ProfileScreen(
+                                        userId: data['fromUserId'],
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          PostViewScreen(data: data),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          );
                         },
-                        onDismissed: (_) {
-                          setState(() {
-                            notifications.removeAt(index);
-                          });
-                        },
-                        child: ListTile(
-                          leading: const CircleAvatar(),
-                          title: Text(notif["title"]),
-                          subtitle: Text(notif["subtitle"]),
-                          trailing: Text(
-                            DateFormat('hh:mm a').format(notif["time"]),
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                        ),
                       );
-                    }),
+                    }).toList(),
                   ],
                 );
-              }),
-            ],
-          );
-        }).toList(),
+              },
+            );
+          },
+        ),
       ),
     );
   }

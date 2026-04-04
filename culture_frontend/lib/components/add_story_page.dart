@@ -93,6 +93,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         "expiresAt": Timestamp.fromDate(
           DateTime.now().add(const Duration(hours: 24)),
         ),
+        "viewers": [],
       });
 
       ScaffoldMessenger.of(

@@ -1,5 +1,11 @@
+import 'dart:async';
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'profile_screen.dart';
+import 'post_view_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -10,6 +16,17 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   String query = "";
+  Timer? debounce;
+
+  void onSearchChanged(String val) {
+    if (debounce?.isActive ?? false) debounce!.cancel();
+
+    debounce = Timer(const Duration(milliseconds: 400), () {
+      setState(() {
+        query = val.toLowerCase();
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +38,7 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             const SizedBox(height: 10),
 
-            ///  GLASS SEARCH BAR
+            /// SEARCH BAR
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: ClipRRect(
@@ -33,15 +50,13 @@ class _SearchScreenState extends State<SearchScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(25),
-                      border: Border.all(color: Colors.white.withOpacity(0.2)),
                     ),
                     child: TextField(
-                      onChanged: (val) => setState(() => query = val),
+                      onChanged: onSearchChanged,
                       style: const TextStyle(color: Colors.white),
                       decoration: const InputDecoration(
-                        icon: Icon(Icons.search, color: Colors.white70),
-                        hintText: "Search culture...",
-                        hintStyle: TextStyle(color: Colors.white54),
+                        icon: Icon(Icons.search),
+                        hintText: "Search...",
                         border: InputBorder.none,
                       ),
                     ),
@@ -50,79 +65,117 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
 
-            const SizedBox(height: 15),
-
-            /// CATEGORY CHIPS (optional)
-            SizedBox(
-              height: 40,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [
-                  _chip("All"),
-                  _chip("Food"),
-                  _chip("Festival"),
-                  _chip("Dance"),
-                  _chip("Village"),
-                ],
-              ),
-            ),
-
             const SizedBox(height: 10),
 
-            /// EXPLORE GRID
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(4),
-                itemCount: 30,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 4,
-                  mainAxisSpacing: 4,
-                ),
-                itemBuilder: (context, index) {
-                  return GestureDetector(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Open post $index")),
-                      );
-                    },
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Color(0xFFFF5100).withOpacity(0.8),
-                              Colors.black,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: const Icon(Icons.image, color: Colors.white30),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+            Expanded(child: query.isEmpty ? _exploreGrid() : _searchResults()),
           ],
         ),
       ),
     );
   }
 
-  /// 🧊 CHIP
-  Widget _chip(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Chip(
-        label: Text(text),
-        backgroundColor: Colors.white.withOpacity(0.1),
-        labelStyle: const TextStyle(color: Colors.white),
-        side: BorderSide(color: Colors.white.withOpacity(0.2)),
-      ),
+  /// 🔥 EXPLORE GRID
+  Widget _exploreGrid() {
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance.collection('posts').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final posts = snapshot.data!.docs;
+
+        return GridView.builder(
+          itemCount: posts.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+          ),
+          itemBuilder: (context, index) {
+            final data = posts[index].data() as Map<String, dynamic>;
+
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => PostViewScreen(data: data)),
+                );
+              },
+              child: Image.network(data['mediaUrl'], fit: BoxFit.cover),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// 🔍 SEARCH USERS + POSTS
+  Widget _searchResults() {
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance.collection('users').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final users = snapshot.data!.docs.where((doc) {
+          final username = doc['username'].toString().toLowerCase();
+          return username.contains(query);
+        }).toList();
+
+        return ListView(
+          children: [
+            /// USERS
+            ...users.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+
+              return ListTile(
+                title: Text(data['username']),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProfileScreen(userId: doc.id),
+                    ),
+                  );
+                },
+              );
+            }),
+
+            const Divider(),
+
+            /// POSTS SEARCH
+            FutureBuilder(
+              future: FirebaseFirestore.instance.collection('posts').get(),
+              builder: (context, snap) {
+                if (!snap.hasData) return const SizedBox();
+
+                final posts = snap.data!.docs.where((doc) {
+                  final caption = doc['caption'].toString().toLowerCase();
+                  return caption.contains(query);
+                }).toList();
+
+                return Column(
+                  children: posts.map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+
+                    return ListTile(
+                      title: Text(data['caption'] ?? ""),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PostViewScreen(data: data),
+                          ),
+                        );
+                      },
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

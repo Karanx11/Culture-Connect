@@ -44,7 +44,8 @@ class _StoryViewerAdvancedState extends State<StoryViewerAdvanced> {
 
   @override
   Widget build(BuildContext context) {
-    final story = widget.stories[currentIndex];
+    final storyDoc = widget.stories[currentIndex];
+    final story = storyDoc.data() as Map<String, dynamic>;
 
     return Scaffold(
       backgroundColor: Colors.black,

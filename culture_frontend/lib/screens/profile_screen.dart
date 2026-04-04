@@ -1,14 +1,18 @@
+import 'package:culture_frontend/screens/add_highligh_screen.dart';
 import 'package:culture_frontend/screens/add_post_screen.dart';
+import 'package:culture_frontend/screens/highlight_viewer.dart';
 import 'package:culture_frontend/screens/login_screen.dart';
 import 'package:culture_frontend/screens/settings_screen.dart';
 import 'package:culture_frontend/screens/edit_profile_screen.dart';
+import 'package:culture_frontend/screens/post_view_screen.dart';
+import 'package:culture_frontend/screens/user_list_screen.dart';
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final String? userId; // 👈 IMPORTANT (for other users)
+  final String? userId;
 
   const ProfileScreen({super.key, this.userId});
 
@@ -16,7 +20,8 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
   String name = "";
   String username = "";
   String bio = "";
@@ -26,9 +31,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List followers = [];
   List following = [];
 
+  int postCount = 0;
+
   bool isLoading = true;
 
   String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+
+  late TabController _tabController;
 
   String get profileUserId =>
       widget.userId ?? FirebaseAuth.instance.currentUser!.uid;
@@ -36,10 +45,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     fetchUserData();
   }
 
-  /// 🔥 FETCH USER
+  /// 🔥 FETCH USER DATA
   Future<void> fetchUserData() async {
     final doc = await FirebaseFirestore.instance
         .collection('users')
@@ -47,6 +57,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .get();
 
     final data = doc.data()!;
+
+    final posts = await FirebaseFirestore.instance
+        .collection('posts')
+        .where('uid', isEqualTo: profileUserId)
+        .get();
 
     setState(() {
       name = data['name'] ?? "";
@@ -57,6 +72,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       followers = data['followers'] ?? [];
       following = data['following'] ?? [];
+
+      postCount = posts.docs.length;
 
       isLoading = false;
     });
@@ -90,7 +107,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     }
 
-    fetchUserData(); // refresh
+    fetchUserData();
   }
 
   @override
@@ -101,7 +118,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: const Color(0xFF1A0F0A),
 
       appBar: AppBar(
-        title: const Text("Profile"),
+        title: Text(username),
         backgroundColor: Colors.transparent,
         actions: isOwnProfile
             ? [
@@ -118,38 +135,132 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                /// COVER
-                Container(
-                  height: 120,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    image: coverUrl.isNotEmpty
-                        ? DecorationImage(
-                            image: NetworkImage(coverUrl),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                    color: Colors.grey,
+                /// 🔥 HEADER
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      height: 150,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        image: coverUrl.isNotEmpty
+                            ? DecorationImage(
+                                image: NetworkImage(coverUrl),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                        color: Colors.grey,
+                      ),
+                    ),
+
+                    Positioned(
+                      bottom: -40,
+                      left: 20,
+                      child: CircleAvatar(
+                        radius: 40,
+                        backgroundImage: profileUrl.isNotEmpty
+                            ? NetworkImage(profileUrl)
+                            : null,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 50),
+
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-
-                /// PROFILE
-                CircleAvatar(
-                  radius: 40,
-                  backgroundImage: profileUrl.isNotEmpty
-                      ? NetworkImage(profileUrl)
-                      : null,
+                Text(
+                  "@$username",
+                  style: const TextStyle(color: Colors.white70),
                 ),
-
-                const SizedBox(height: 10),
-
-                Text(name, style: const TextStyle(fontSize: 18)),
-                Text("@$username"),
                 Text(bio),
+                SizedBox(
+                  height: 100,
+                  child: StreamBuilder(
+                    stream: FirebaseFirestore.instance
+                        .collection('highlights')
+                        .where('uid', isEqualTo: profileUserId)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
+                      final highlights = snapshot.data!.docs;
+
+                      return ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: highlights.length + 1,
+                        itemBuilder: (context, index) {
+                          /// ➕ ADD
+                          if (index == 0) {
+                            return GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const AddHighlightScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Column(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 30,
+                                    child: Icon(Icons.add),
+                                  ),
+                                  Text("New"),
+                                ],
+                              ),
+                            );
+                          }
+
+                          final data = highlights[index - 1];
+
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => HighlightViewer(
+                                    stories: List<String>.from(
+                                      data['storyUrls'],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              child: Column(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 30,
+                                    backgroundImage: NetworkImage(
+                                      data['coverImage'],
+                                    ),
+                                  ),
+                                  Text(data['title']),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
                 const SizedBox(height: 10),
 
-                /// FOLLOW / EDIT BUTTON
+                /// 🔥 BUTTON
                 isOwnProfile
                     ? ElevatedButton(
                         onPressed: () async {
@@ -172,19 +283,123 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
 
-                const SizedBox(height: 15),
+                const SizedBox(height: 10),
 
-                /// STATS
+                /// 🔥 STATS
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _stat("Posts", "12"),
-                    _stat("Followers", followers.length.toString()),
-                    _stat("Following", following.length.toString()),
+                    _stat("Posts", postCount.toString()),
+
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => UserListScreen(
+                              userIds: followers,
+                              title: "Followers",
+                            ),
+                          ),
+                        );
+                      },
+                      child: _stat("Followers", followers.length.toString()),
+                    ),
+
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => UserListScreen(
+                              userIds: following,
+                              title: "Following",
+                            ),
+                          ),
+                        );
+                      },
+                      child: _stat("Following", following.length.toString()),
+                    ),
                   ],
+                ),
+
+                const SizedBox(height: 10),
+
+                /// 🔥 TABS
+                TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(icon: Icon(Icons.grid_on)),
+                    Tab(icon: Icon(Icons.video_collection)),
+                  ],
+                ),
+
+                /// 🔥 CONTENT
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [_buildPostsGrid(false), _buildPostsGrid(true)],
+                  ),
                 ),
               ],
             ),
+    );
+  }
+
+  /// 🔥 POSTS GRID
+  Widget _buildPostsGrid(bool isVideo) {
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance
+          .collection('posts')
+          .where('uid', isEqualTo: profileUserId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final posts = snapshot.data!.docs.where((doc) {
+          return isVideo ? doc['type'] == "video" : doc['type'] == "image";
+        }).toList();
+
+        if (posts.isEmpty) {
+          return const Center(child: Text("No posts"));
+        }
+
+        return GridView.builder(
+          itemCount: posts.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 4,
+            mainAxisSpacing: 4,
+          ),
+          itemBuilder: (context, index) {
+            final data = posts[index].data() as Map<String, dynamic>;
+
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => PostViewScreen(data: data)),
+                );
+              },
+              child: data['type'] == "video"
+                  ? Stack(
+                      children: [
+                        Image.network(
+                          data['mediaUrl'],
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                        ),
+                        const Center(child: Icon(Icons.play_arrow)),
+                      ],
+                    )
+                  : Image.network(data['mediaUrl'], fit: BoxFit.cover),
+            );
+          },
+        );
+      },
     );
   }
 

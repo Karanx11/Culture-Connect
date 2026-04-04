@@ -35,7 +35,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final data = widget.story;
+    final data = widget.story.data() as Map<String, dynamic>;
 
     return Scaffold(
       backgroundColor: Colors.black,
