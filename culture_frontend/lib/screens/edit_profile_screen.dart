@@ -1,12 +1,13 @@
 import 'dart:io';
 import 'dart:ui';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -32,13 +33,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool isLoading = true;
   bool isSaving = false;
 
+  final String cloudName = "ddkmxxkf8";
+
   @override
   void initState() {
     super.initState();
     loadUserData();
   }
 
-  /// 🔥 LOAD EXISTING DATA
+  /// 🔥 LOAD USER DATA
   Future<void> loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -65,7 +68,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  /// 📸 PICK PROFILE IMAGE
+  /// 📸 PICK IMAGES
   Future<void> pickProfileImage() async {
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
@@ -73,7 +76,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  /// 🖼 PICK COVER IMAGE
   Future<void> pickCoverImage() async {
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
@@ -81,58 +83,87 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  /// 🔥 UPLOAD IMAGE
-  Future<String> uploadImage(File file, String path) async {
-    final ref = FirebaseStorage.instance.ref().child(path);
+  /// ☁️ CLOUDINARY UPLOAD
+  Future<String> uploadToCloudinary(File file) async {
+    final url = Uri.parse(
+      "https://api.cloudinary.com/v1_1/$cloudName/image/upload",
+    );
 
-    await ref.putFile(file);
+    final request = http.MultipartRequest("POST", url);
 
-    return await ref.getDownloadURL();
+    request.fields['upload_preset'] = 'culture_upload';
+    request.files.add(await http.MultipartFile.fromPath('file', file.path));
+
+    final response = await request.send();
+    final res = await http.Response.fromStream(response);
+
+    final data = jsonDecode(res.body);
+
+    return data['secure_url'];
   }
 
   /// 💾 SAVE PROFILE
   Future<void> saveProfile() async {
     setState(() => isSaving = true);
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
 
-    String updatedProfileUrl = profileUrl;
-    String updatedCoverUrl = coverUrl;
+      final usersRef = FirebaseFirestore.instance.collection('users');
 
-    // upload profile image
-    if (profileImage != null) {
-      updatedProfileUrl = await uploadImage(
-        profileImage!,
-        "users/${user.uid}/profile.jpg",
-      );
+      final newUsername = usernameController.text.trim().toLowerCase();
+
+      /// 🔍 CHECK UNIQUE USERNAME
+      final existing = await usersRef
+          .where('username', isEqualTo: newUsername)
+          .get();
+
+      if (existing.docs.isNotEmpty && existing.docs.first.id != user.uid) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Username already taken")));
+        setState(() => isSaving = false);
+        return;
+      }
+
+      String updatedProfileUrl = profileUrl;
+      String updatedCoverUrl = coverUrl;
+
+      /// ☁️ UPLOAD PROFILE IMAGE
+      if (profileImage != null) {
+        updatedProfileUrl = await uploadToCloudinary(profileImage!);
+      }
+
+      /// ☁️ UPLOAD COVER IMAGE
+      if (coverImage != null) {
+        updatedCoverUrl = await uploadToCloudinary(coverImage!);
+      }
+
+      /// 🔥 UPDATE FIRESTORE
+      await usersRef.doc(user.uid).update({
+        "name": nameController.text.trim(),
+        "username": newUsername,
+        "bio": bioController.text.trim(),
+        "city": cityController.text.trim(),
+        "profileUrl": updatedProfileUrl,
+        "coverUrl": updatedCoverUrl,
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Profile Updated ✅")));
+
+      Navigator.pop(context);
+    } catch (e) {
+      print("ERROR: $e");
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
-
-    // upload cover image
-    if (coverImage != null) {
-      updatedCoverUrl = await uploadImage(
-        coverImage!,
-        "users/${user.uid}/cover.jpg",
-      );
-    }
-
-    // update firestore
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-      "name": nameController.text.trim(),
-      "username": usernameController.text.trim().toLowerCase(),
-      "bio": bioController.text.trim(),
-      "city": cityController.text.trim(),
-      "profileUrl": updatedProfileUrl,
-      "coverUrl": updatedCoverUrl,
-    });
 
     setState(() => isSaving = false);
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text("Profile Updated ✅")));
-
-    Navigator.pop(context);
   }
 
   @override
@@ -245,7 +276,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  /// INPUT FIELD
   Widget _input(
     TextEditingController controller,
     String hint,

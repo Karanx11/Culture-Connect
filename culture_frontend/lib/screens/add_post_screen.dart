@@ -1,8 +1,14 @@
 import 'dart:io';
 import 'dart:ui';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
+import 'package:http/http.dart' as http;
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -19,10 +25,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   final picker = ImagePicker();
 
-  int selectedType = 0; // 0 = Post, 1 = Reel
+  int selectedType = 0; // 0 = image, 1 = video
 
-  final TextEditingController captionController = TextEditingController();
-  final TextEditingController locationController = TextEditingController();
+  final captionController = TextEditingController();
+  final locationController = TextEditingController();
+
+  bool isUploading = false;
+
+  final cloudName = "ddkmxxkf8";
 
   /// 📸 PICK IMAGE
   Future<void> pickImage() async {
@@ -54,6 +64,81 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
+  /// ☁️ CLOUDINARY UPLOAD
+  Future<String> uploadFile(File file, bool isVideo) async {
+    final url = Uri.parse(
+      "https://api.cloudinary.com/v1_1/$cloudName/${isVideo ? "video" : "image"}/upload",
+    );
+
+    final request = http.MultipartRequest("POST", url);
+    request.fields['upload_preset'] = 'culture_upload';
+
+    request.files.add(await http.MultipartFile.fromPath('file', file.path));
+
+    final response = await request.send();
+    final res = await http.Response.fromStream(response);
+
+    final data = jsonDecode(res.body);
+
+    return data['secure_url'];
+  }
+
+  /// 🚀 CREATE POST
+  Future<void> createPost() async {
+    if (selectedType == 0 && image == null) {
+      _showMsg("Select image");
+      return;
+    }
+    if (selectedType == 1 && video == null) {
+      _showMsg("Select video");
+      return;
+    }
+
+    setState(() => isUploading = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      /// upload media
+      String mediaUrl = "";
+
+      if (selectedType == 0) {
+        mediaUrl = await uploadFile(image!, false);
+      } else {
+        mediaUrl = await uploadFile(video!, true);
+      }
+
+      /// get user data
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final userData = userDoc.data()!;
+
+      /// save post
+      await FirebaseFirestore.instance.collection('posts').add({
+        "uid": user.uid,
+        "username": userData['username'],
+        "profileUrl": userData['profileUrl'],
+        "mediaUrl": mediaUrl,
+        "caption": captionController.text.trim(),
+        "location": locationController.text.trim(),
+        "type": selectedType == 0 ? "image" : "video",
+        "likes": [],
+        "createdAt": FieldValue.serverTimestamp(),
+      });
+
+      _showMsg("Post uploaded 🚀");
+      Navigator.pop(context);
+    } catch (e) {
+      _showMsg("Error: $e");
+    }
+
+    setState(() => isUploading = false);
+  }
+
   @override
   void dispose() {
     videoController?.dispose();
@@ -75,21 +160,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            /// 🔥 TOGGLE (POST / REEL)
+            /// TOGGLE
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(30),
               ),
-              child: Row(
-                children: [_tabButton("Photos", 0), _tabButton("Video", 1)],
-              ),
+              child: Row(children: [_tab("Photos", 0), _tab("Video", 1)]),
             ),
 
             const SizedBox(height: 20),
 
-            /// 📸 / 🎥 PREVIEW
+            /// PREVIEW
             GestureDetector(
               onTap: selectedType == 0 ? pickImage : pickVideo,
               child: Container(
@@ -98,64 +181,31 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
                 ),
-                child: _buildPreview(),
+                child: _preview(),
               ),
             ),
 
             const SizedBox(height: 20),
 
-            /// 🧊 CAPTION
-            _glassInput(
-              controller: captionController,
-              hint: "Write a caption...",
-              icon: Icons.edit,
-              maxLines: 3,
-            ),
-
+            _input(captionController, "Caption", Icons.edit, maxLines: 3),
             const SizedBox(height: 15),
-
-            /// 📍 LOCATION
-            _glassInput(
-              controller: locationController,
-              hint: "Add location",
-              icon: Icons.location_on,
-            ),
+            _input(locationController, "Location", Icons.location_on),
 
             const SizedBox(height: 25),
 
-            /// 🚀 SHARE BUTTON
+            /// 🚀 UPLOAD BUTTON
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
+                onPressed: isUploading ? null : createPost,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF5100),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
                 ),
-                onPressed: () {
-                  if (selectedType == 0 && image == null) {
-                    _showMsg("Please select an image");
-                    return;
-                  }
-                  if (selectedType == 1 && video == null) {
-                    _showMsg("Please select a video");
-                    return;
-                  }
-
-                  _showMsg("Uploaded successfully 🚀");
-                  Navigator.pop(context);
-                },
-                child: Text(
-                  selectedType == 0 ? "Share Post" : "Upload Reel",
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                child: isUploading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(selectedType == 0 ? "Share Post" : "Upload Reel"),
               ),
             ),
           ],
@@ -164,8 +214,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  /// 🔘 TAB BUTTON
-  Widget _tabButton(String text, int index) {
+  Widget _tab(String text, int index) {
     final isSelected = selectedType == index;
 
     return Expanded(
@@ -191,87 +240,42 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  /// 🎥 / 📸 PREVIEW BUILDER
-  Widget _buildPreview() {
+  Widget _preview() {
     if (selectedType == 0) {
-      /// IMAGE
       if (image == null) {
-        return const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.add_a_photo, size: 40, color: Colors.white70),
-              SizedBox(height: 10),
-              Text("Tap to add photo", style: TextStyle(color: Colors.white70)),
-            ],
-          ),
-        );
-      } else {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Image.file(image!, fit: BoxFit.cover),
-        );
+        return const Center(child: Text("Tap to add photo"));
       }
+      return Image.file(image!, fit: BoxFit.cover);
     } else {
-      /// VIDEO
-      if (video == null || videoController == null) {
-        return const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.video_call, size: 40, color: Colors.white70),
-              SizedBox(height: 10),
-              Text("Tap to add reel", style: TextStyle(color: Colors.white70)),
-            ],
-          ),
-        );
-      } else {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: AspectRatio(
-            aspectRatio: videoController!.value.aspectRatio,
-            child: VideoPlayer(videoController!),
-          ),
-        );
+      if (videoController == null) {
+        return const Center(child: Text("Tap to add video"));
       }
+      return AspectRatio(
+        aspectRatio: videoController!.value.aspectRatio,
+        child: VideoPlayer(videoController!),
+      );
     }
+  }
+
+  Widget _input(
+    TextEditingController c,
+    String h,
+    IconData i, {
+    int maxLines = 1,
+  }) {
+    return TextField(
+      controller: c,
+      maxLines: maxLines,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        hintText: h,
+        hintStyle: const TextStyle(color: Colors.white54),
+        prefixIcon: Icon(i, color: Colors.white70),
+      ),
+    );
   }
 
   void _showMsg(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  /// 🧊 INPUT
-  Widget _glassInput({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    int maxLines = 1,
-  }) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(15),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
-          ),
-          child: TextField(
-            controller: controller,
-            maxLines: maxLines,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              icon: Icon(icon, color: Colors.white70),
-              hintText: hint,
-              hintStyle: const TextStyle(color: Colors.white54),
-              border: InputBorder.none,
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
