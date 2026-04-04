@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "538046401422",
+    "project_id": "culture-connect-ce71e",
+    "storage_bucket": "culture-connect-ce71e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:538046401422:android:4c910af27587859073b2df",
+        "android_client_info": {
+          "package_name": "com.example.culture_frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYh50S302oH66phOt0Q2r46On9QZj9YwA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
