@@ -124,22 +124,22 @@ It allows users to share posts, stories, reels, follow others, and interact thro
 
 ## 📂 Project Structure
 
-lib/
-│
-├── screens/
-│ ├── auth/
-│ ├── home_screen.dart
-│ ├── explore_screen.dart
-│ ├── search_screen.dart
-│ ├── profile_screen.dart
-│ ├── add_post_screen.dart
-│ ├── story/
-│ ├── highlight/
-│ ├── notification_screen.dart
-│
-├── widgets/
-├── utils/
-├── main.dart
+  lib/
+  │
+  ├── screens/
+  │ ├── auth/
+  │ ├── home_screen.dart
+  │ ├── explore_screen.dart
+  │ ├── search_screen.dart
+  │ ├── profile_screen.dart
+  │ ├── add_post_screen.dart
+  │ ├── story/
+  │ ├── highlight/
+  │ ├── notification_screen.dart
+  │
+  ├── widgets/
+  ├── utils/
+  ├── main.dart
 
 
 ---
