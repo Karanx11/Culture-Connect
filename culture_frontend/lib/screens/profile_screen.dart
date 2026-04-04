@@ -1,5 +1,8 @@
 import 'package:culture_frontend/screens/add_post_screen.dart';
+import 'package:culture_frontend/screens/login_screen.dart';
 import 'package:culture_frontend/screens/settings_screen.dart';
+import 'package:culture_frontend/screens/edit_profile_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,6 +19,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   String name = "";
   String username = "";
+  String bio = "";
+  String profileUrl = "";
+  String coverUrl = "";
   bool isLoading = true;
 
   @override
@@ -28,7 +34,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> fetchUserData() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-
       if (user == null) return;
 
       final doc = await FirebaseFirestore.instance
@@ -40,6 +45,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           name = doc['name'] ?? "";
           username = doc['username'] ?? "";
+          bio = doc['bio'] ?? "";
+          profileUrl = doc['profileUrl'] ?? "";
+          coverUrl = doc['coverUrl'] ?? "";
           isLoading = false;
         });
       }
@@ -82,44 +90,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       child: Column(
                         children: [
-                          /// COVER + PROFILE
+                          /// 🔥 COVER + PROFILE
                           Stack(
                             clipBehavior: Clip.none,
                             children: [
                               Container(
                                 height: 120,
-                                decoration: const BoxDecoration(
-                                  borderRadius: BorderRadius.vertical(
+                                decoration: BoxDecoration(
+                                  borderRadius: const BorderRadius.vertical(
                                     top: Radius.circular(25),
                                   ),
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xFFFF5100),
-                                      Color(0xFF1A0F0A),
-                                    ],
-                                  ),
+                                  image: coverUrl.isNotEmpty
+                                      ? DecorationImage(
+                                          image: NetworkImage(coverUrl),
+                                          fit: BoxFit.cover,
+                                        )
+                                      : null,
+                                  gradient: coverUrl.isEmpty
+                                      ? const LinearGradient(
+                                          colors: [
+                                            Color(0xFFFF5100),
+                                            Color(0xFF1A0F0A),
+                                          ],
+                                        )
+                                      : null,
                                 ),
                               ),
 
+                              /// PROFILE IMAGE
                               Positioned(
                                 bottom: -40,
                                 left: 0,
                                 right: 0,
                                 child: Center(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: const Color(0xFF241510),
-                                        width: 4,
-                                      ),
-                                    ),
-                                    child: const CircleAvatar(
-                                      radius: 40,
-                                      backgroundImage: AssetImage(
-                                        "assets/images/logo.jpg",
-                                      ),
-                                    ),
+                                  child: CircleAvatar(
+                                    radius: 40,
+                                    backgroundImage: profileUrl.isNotEmpty
+                                        ? NetworkImage(profileUrl)
+                                        : const AssetImage(
+                                                "assets/images/logo.jpg",
+                                              )
+                                              as ImageProvider,
                                   ),
                                 ),
                               ),
@@ -128,7 +139,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                           const SizedBox(height: 50),
 
-                          /// 🔥 DYNAMIC NAME
+                          /// NAME
                           Text(
                             name,
                             style: const TextStyle(
@@ -139,13 +150,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                           const SizedBox(height: 4),
 
-                          /// 🔥 DYNAMIC USERNAME
+                          /// USERNAME
                           Text(
                             "@$username",
                             style: const TextStyle(color: Colors.white70),
                           ),
 
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
+
+                          /// BIO
+                          Text(
+                            bio.isNotEmpty ? bio : "No bio added",
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+
+                          const SizedBox(height: 15),
+
+                          /// EDIT BUTTON
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const EditProfileScreen(),
+                                ),
+                              ).then((_) => fetchUserData());
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF5100),
+                            ),
+                            child: const Text("Edit Profile"),
+                          ),
+
+                          const SizedBox(height: 15),
 
                           const Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -240,7 +278,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: const Text("Logout"),
             onTap: () async {
               await FirebaseAuth.instance.signOut();
-              Navigator.pop(context);
+
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
             },
           ),
         ],
