@@ -1,5 +1,6 @@
 import 'package:culture_frontend/screens/add_highligh_screen.dart';
 import 'package:culture_frontend/screens/add_post_screen.dart';
+import 'package:culture_frontend/screens/edit_highlight_scren.dart';
 import 'package:culture_frontend/screens/highlight_viewer.dart';
 import 'package:culture_frontend/screens/login_screen.dart';
 import 'package:culture_frontend/screens/settings_screen.dart';
@@ -31,8 +32,6 @@ class _ProfileScreenState extends State<ProfileScreen>
   List followers = [];
   List following = [];
 
-  int postCount = 0;
-
   bool isLoading = true;
 
   String currentUserId = FirebaseAuth.instance.currentUser!.uid;
@@ -49,6 +48,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     fetchUserData();
   }
 
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   /// 🔥 FETCH USER DATA
   Future<void> fetchUserData() async {
     final doc = await FirebaseFirestore.instance
@@ -57,11 +62,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         .get();
 
     final data = doc.data()!;
-
-    final posts = await FirebaseFirestore.instance
-        .collection('posts')
-        .where('uid', isEqualTo: profileUserId)
-        .get();
 
     setState(() {
       name = data['name'] ?? "";
@@ -72,8 +72,6 @@ class _ProfileScreenState extends State<ProfileScreen>
 
       followers = data['followers'] ?? [];
       following = data['following'] ?? [];
-
-      postCount = posts.docs.length;
 
       isLoading = false;
     });
@@ -158,8 +156,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                       left: 20,
                       child: CircleAvatar(
                         radius: 40,
+                        backgroundColor: Colors.grey,
                         backgroundImage: profileUrl.isNotEmpty
                             ? NetworkImage(profileUrl)
+                            : null,
+                        child: profileUrl.isEmpty
+                            ? const Icon(Icons.person)
                             : null,
                       ),
                     ),
@@ -175,17 +177,24 @@ class _ProfileScreenState extends State<ProfileScreen>
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 Text(
                   "@$username",
                   style: const TextStyle(color: Colors.white70),
                 ),
+
                 Text(bio),
+
+                const SizedBox(height: 15),
+
+                /// 🔥 HIGHLIGHTS (FIXED)
                 SizedBox(
                   height: 100,
                   child: StreamBuilder(
                     stream: FirebaseFirestore.instance
                         .collection('highlights')
                         .where('uid', isEqualTo: profileUserId)
+                        .orderBy('order')
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
@@ -194,22 +203,44 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                       final highlights = snapshot.data!.docs;
 
-                      return ListView.builder(
+                      /// 👉 IF NO HIGHLIGHTS
+                      if (highlights.isEmpty) {
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AddHighlightScreen(),
+                              ),
+                            );
+                          },
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircleAvatar(radius: 30, child: Icon(Icons.add)),
+                              SizedBox(height: 5),
+                              Text("Add Highlight"),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return ListView(
                         scrollDirection: Axis.horizontal,
-                        itemCount: highlights.length + 1,
-                        itemBuilder: (context, index) {
-                          /// ➕ ADD
-                          if (index == 0) {
-                            return GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const AddHighlightScreen(),
-                                  ),
-                                );
-                              },
-                              child: const Column(
+                        children: [
+                          /// ➕ ADD BUTTON
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const AddHighlightScreen(),
+                                ),
+                              );
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: Column(
                                 children: [
                                   CircleAvatar(
                                     radius: 30,
@@ -218,46 +249,61 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   Text("New"),
                                 ],
                               ),
-                            );
-                          }
-
-                          final data = highlights[index - 1];
-
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => HighlightViewer(
-                                    stories: List<String>.from(
-                                      data['storyUrls'],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                              child: Column(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 30,
-                                    backgroundImage: NetworkImage(
-                                      data['coverImage'],
-                                    ),
-                                  ),
-                                  Text(data['title']),
-                                ],
-                              ),
                             ),
-                          );
-                        },
+                          ),
+
+                          /// 🔥 HIGHLIGHTS
+                          ...highlights.map((data) {
+                            return GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => HighlightViewer(
+                                      stories: List<String>.from(
+                                        data['storyUrls'],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                              onLongPress: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => EditHighlightScreen(
+                                      id: data.id,
+                                      data: data.data(),
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                child: Column(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 30,
+                                      backgroundImage:
+                                          data['coverImage'] != null
+                                          ? NetworkImage(data['coverImage'])
+                                          : null,
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(data['title']),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ],
                       );
                     },
                   ),
                 ),
+
                 const SizedBox(height: 10),
 
                 /// 🔥 BUTTON
@@ -289,7 +335,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _stat("Posts", postCount.toString()),
+                    StreamBuilder(
+                      stream: FirebaseFirestore.instance
+                          .collection('posts')
+                          .where('uid', isEqualTo: profileUserId)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        int count = snapshot.hasData
+                            ? snapshot.data!.docs.length
+                            : 0;
+                        return _stat("Posts", count.toString());
+                      },
+                    ),
 
                     GestureDetector(
                       onTap: () {
@@ -334,7 +391,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ],
                 ),
 
-                /// 🔥 CONTENT
+                /// 🔥 POSTS
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
@@ -346,7 +403,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  /// 🔥 POSTS GRID
   Widget _buildPostsGrid(bool isVideo) {
     return StreamBuilder(
       stream: FirebaseFirestore.instance
@@ -370,8 +426,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           itemCount: posts.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            crossAxisSpacing: 4,
-            mainAxisSpacing: 4,
           ),
           itemBuilder: (context, index) {
             final data = posts[index].data() as Map<String, dynamic>;
@@ -383,19 +437,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   MaterialPageRoute(builder: (_) => PostViewScreen(data: data)),
                 );
               },
-              child: data['type'] == "video"
-                  ? Stack(
-                      children: [
-                        Image.network(
-                          data['mediaUrl'],
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                        ),
-                        const Center(child: Icon(Icons.play_arrow)),
-                      ],
-                    )
-                  : Image.network(data['mediaUrl'], fit: BoxFit.cover),
+              child: Image.network(data['mediaUrl'], fit: BoxFit.cover),
             );
           },
         );
@@ -403,7 +445,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  /// STAT UI
   Widget _stat(String label, String value) {
     return Column(
       children: [
