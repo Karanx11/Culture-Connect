@@ -4,8 +4,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'profile_screen.dart';
-import 'post_view_screen.dart';
+import 'profile/profile_screen.dart';
+import 'posts/post_view_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});

@@ -21,7 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  // 🔥 LOGIN FUNCTION
+  // LOGIN FUNCTION
   Future<void> loginUser() async {
     setState(() => isLoading = true);
 
@@ -35,7 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final users = FirebaseFirestore.instance.collection('users');
 
-      // 🔍 username → email
+      //  username → email
       final result = await users.where('username', isEqualTo: username).get();
 
       if (result.docs.isEmpty) {
@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
       );
 
-      // 🔄 reload user to check verification
+      // reload user to check verification
       await cred.user!.reload();
 
       if (!FirebaseAuth.instance.currentUser!.emailVerified) {

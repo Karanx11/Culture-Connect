@@ -1,5 +1,5 @@
-import 'package:culture_frontend/components/add_story_page.dart';
-import 'package:culture_frontend/components/story_viewr_advanced.dart';
+import 'package:culture_frontend/components/stories/add_story_page.dart';
+import 'package:culture_frontend/components/stories/story_viewr_advanced.dart';
 import 'package:culture_frontend/screens/notification_page.dart';
 import 'package:flutter/material.dart';
 

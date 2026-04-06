@@ -1,11 +1,11 @@
-import 'package:culture_frontend/screens/add_highligh_screen.dart';
-import 'package:culture_frontend/screens/add_post_screen.dart';
-import 'package:culture_frontend/screens/edit_highlight_scren.dart';
-import 'package:culture_frontend/screens/highlight_viewer.dart';
-import 'package:culture_frontend/screens/login_screen.dart';
+import 'package:culture_frontend/components/highlights/add_highligh_screen.dart';
+import 'package:culture_frontend/screens/posts/add_post_screen.dart';
+import 'package:culture_frontend/components/highlights/edit_highlight_scren.dart';
+import 'package:culture_frontend/components/highlights/highlight_viewer.dart';
+import 'package:culture_frontend/screens/auth/login_screen.dart';
 import 'package:culture_frontend/screens/settings_screen.dart';
-import 'package:culture_frontend/screens/edit_profile_screen.dart';
-import 'package:culture_frontend/screens/post_view_screen.dart';
+import 'package:culture_frontend/screens/profile/edit_profile_screen.dart';
+import 'package:culture_frontend/screens/posts/post_view_screen.dart';
 import 'package:culture_frontend/screens/user_list_screen.dart';
 
 import 'package:flutter/material.dart';

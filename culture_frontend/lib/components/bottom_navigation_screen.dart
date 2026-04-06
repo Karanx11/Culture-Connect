@@ -1,9 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:culture_frontend/screens/add_post_screen.dart';
+import 'package:culture_frontend/screens/posts/add_post_screen.dart';
 import 'package:culture_frontend/screens/explore_screen.dart';
 import 'package:culture_frontend/screens/home_screen.dart';
-import 'package:culture_frontend/screens/profile_screen.dart';
+import 'package:culture_frontend/screens/profile/profile_screen.dart';
 import 'package:culture_frontend/screens/search_screen.dart';
 
 class MainScreen extends StatefulWidget {
